@@ -94,7 +94,7 @@ impl<'a> Digi4SchoolScraper<'a> {
 
         u16::from_str(
             regex!(r"IDRViewer\.makeNavBar\((\d+),'\.jpg'")
-                .captures(resp.text())
+                .captures(&resp.text())
                 .unwrap_or_else(panic_closure!())
                 .get(1)
                 .unwrap_or_else(panic_closure!())

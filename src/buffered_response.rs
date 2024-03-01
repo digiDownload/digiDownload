@@ -1,41 +1,59 @@
 use reqwest::Response;
+use std::cell::Cell;
 use std::ops::Deref;
-use std::str::from_utf8;
 
 /// Stores a response and keeps track of its body in one type.
 /// Circumvents consumption of Response by `.text()` or `.bytes()`
 /// Does not lazily load the body -> Use only use if you are sure you need the text
 pub struct BufferedResponse {
     resp: Response,
-    buf: String,
+    buf: Vec<u8>,
+
+    utf8_check_passed: Cell<bool>,
 }
 
 impl BufferedResponse {
     pub async fn new(mut resp: Response) -> Result<Self, reqwest::Error> {
         let buf = Self::get_buf(&mut resp).await?;
 
-        Ok(Self { resp, buf })
+        Ok(Self {
+            resp,
+            buf,
+
+            utf8_check_passed: Cell::new(false),
+        })
     }
 
-    pub fn text(&self) -> &str {
+    pub fn text(&self) -> String {
+        if self.utf8_check_passed.get() {
+            unsafe { return String::from_utf8_unchecked(self.buf.clone()) }
+        }
+
+        let result = String::from_utf8(self.buf.clone()).expect("expected charset to be utf8");
+        self.utf8_check_passed.set(true);
+        result
+    }
+
+    pub fn bytes(&self) -> &[u8] {
         &self.buf
     }
 
-    async fn get_buf(resp: &mut Response) -> Result<String, reqwest::Error> {
+    async fn get_buf(resp: &mut Response) -> Result<Vec<u8>, reqwest::Error> {
         let content_length = resp.content_length();
 
-        let mut buf: String;
+        let mut buf: Vec<u8>;
         match content_length {
             Some(length) => {
-                buf = String::with_capacity(length.try_into().unwrap());
+                buf = Vec::with_capacity(length.try_into().unwrap());
             }
-            None => buf = String::new(),
+            None => buf = Vec::new(),
         }
 
         loop {
             if let Some(chunk) = resp.chunk().await? {
-                buf += from_utf8(&chunk).expect("expected charset to be utf8");
+                buf.append(&mut chunk.iter().copied().collect::<Vec<u8>>()); // TODO improve?
             } else {
+                buf.shrink_to_fit();
                 return Ok(buf);
             };
         }

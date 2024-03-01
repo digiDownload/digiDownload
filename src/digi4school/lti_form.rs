@@ -42,7 +42,7 @@ macro_rules! form_attr_expect {
 impl LTIForm {
     #[allow(clippy::question_mark)] // TODO remove. See https://github.com/rust-lang/rust-clippy/issues/12337
     pub fn new(raw_form: &BufferedResponse) -> Option<Self> {
-        let doc = Html::parse_document(raw_form.text());
+        let doc = Html::parse_document(&raw_form.text());
         let selector = Selector::parse("form#lti").unwrap();
 
         let mut iter = doc.root_element().select(&selector);

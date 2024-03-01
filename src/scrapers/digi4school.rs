@@ -1,13 +1,9 @@
 use crate::buffered_response::BufferedResponse;
 use crate::digi4school::book::Book;
 use crate::regex;
-use crate::scrapers::scraper_trait::Scraper;
+use crate::scrapers::scraper_trait::{Scraper, SvgScraper};
 use async_trait::async_trait;
-use base64::prelude::BASE64_STANDARD;
-use base64::Engine;
-use regex::Regex;
 use reqwest::{Client, RequestBuilder};
-use std::fs;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -24,63 +20,6 @@ impl<'a> Digi4SchoolScraper<'a> {
 
     fn get_book_url(&self) -> String {
         format!("{}/ebook/{}", Self::URL, self.book.get_short_id())
-    }
-
-    async fn get_page_svg(&self, page: u16) -> Result<String, reqwest::Error> {
-        assert!(
-            page <= self.page_count,
-            "tried downloading invalid page: {page}/{}",
-            self.page_count
-        );
-
-        let url = format!("{}/{page}.svg", self.get_book_url());
-
-        let content = self.client.get(url).send().await?.text().await?;
-        let content = self.embed_svg_images(content, page).await?;
-
-        // Ok(content)
-
-        // TODO alarm
-        fs::write("/tmp/test.svg", &content).unwrap();
-
-        Ok(content)
-    }
-
-    async fn embed_svg_images(&self, svg: String, page: u16) -> Result<String, reqwest::Error> {
-        let mut svg = svg.clone();
-
-        let url_regex = Regex::new(&format!("xlink:href=\"({}/.+?)\"/>", page)).unwrap();
-
-        for capture in url_regex.captures_iter(&svg.clone()) {
-            let url = capture.get(1).expect("").as_str(); // TODO
-            let resp = self.download_image(url).send().await?;
-
-            let content_type = resp
-                .headers()
-                .get("Content-Type")
-                .unwrap() // TODO
-                .to_str()
-                .unwrap() // TODO
-                .to_owned();
-
-            println!("replaced {} with data:{};base64,[...]", url, content_type);
-
-            svg = svg.replace(
-                url,
-                &format!(
-                    "data:{};base64,{}",
-                    content_type,
-                    BASE64_STANDARD.encode(resp.bytes().await?)
-                ),
-            );
-        }
-
-        Ok(svg)
-    }
-
-    fn download_image(&self, relative_url: &str) -> RequestBuilder {
-        let url = format!("{}/{}", self.get_book_url(), relative_url);
-        self.client.get(url)
     }
 
     /// Takes first response from the `LTIForm` redirects as an input
@@ -101,6 +40,25 @@ impl<'a> Digi4SchoolScraper<'a> {
                 .as_str(),
         )
         .unwrap()
+    }
+}
+
+#[async_trait]
+impl SvgScraper for Digi4SchoolScraper<'_> {
+    async fn get_page_raw_svg(&self, page: u16) -> Result<String, reqwest::Error> {
+        assert!(
+            page <= self.page_count,
+            "tried downloading invalid page: {page}/{}",
+            self.page_count
+        );
+
+        let url = format!("{}/{page}.svg", self.get_book_url());
+        Ok(self.client.get(url).send().await?.text().await?)
+    }
+
+    fn get_image_request(&self, relative_url: &str) -> RequestBuilder {
+        let url = format!("{}/{}", self.get_book_url(), relative_url);
+        self.client.get(url)
     }
 }
 
@@ -128,23 +86,7 @@ impl Scraper for Digi4SchoolScraper<'_> {
     }
 
     async fn fetch_page_pdf(&self, page: u16) -> Result<Vec<u8>, reqwest::Error> {
-        let svg_page = self.get_page_svg(page).await?;
-
-        let svg_page = Regex::new(&format!("xlink:href=.({}/.+?)\"/>", page))
-            .unwrap() // TODO expect
-            .replace_all(
-                &svg_page,
-                &format!(
-                    "xlink:href=\"{}/ebook/{}/$1\"/>",
-                    Self::URL,
-                    self.book.get_short_id()
-                ),
-            );
-
-        fs::write("/tmp/digi/test.svg", &*svg_page).unwrap();
-
-        Ok(svg2pdf::convert_str(&svg_page, svg2pdf::Options::default())
-            .expect("received malformed svg"))
+        Ok(SvgScraper::fetch_page_pdf(self, page).await?)
 
         // TODO add digi4school 'bookmarks' as pdf navigation headers
     }

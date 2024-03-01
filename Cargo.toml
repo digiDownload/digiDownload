@@ -1,0 +1,25 @@
+[package]
+name = "digi_download"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+route_burp = []
+
+[dependencies]
+reqwest = { version = "0.11.24", features = ["cookies"] }
+tokio = { version = "1.36.0", features = ["rt", "rt-multi-thread", "macros"] }
+
+scraper = "0.19.0"
+regex = "1.10.3"
+
+serde = { version = "1.0.197", features = ["derive"] }
+serde_urlencoded = "0.7.1"
+
+svg2pdf = "0.9.1"
+
+base64 = "0.21.7"
+
+async-trait = "0.1.77"
+
+thiserror = "1.0.57"

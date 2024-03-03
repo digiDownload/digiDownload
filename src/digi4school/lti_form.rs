@@ -5,7 +5,7 @@ use scraper::{ElementRef, Html, Selector};
 use std::collections::HashMap;
 use std::str::FromStr;
 
-const BAD_LTI_FORM_MESSAGE: &str = "Bad LTI-form: ";
+const BAD_LTI_FORM_MESSAGE: &str = "Bad LTI-form";
 
 /// LTI-form is just a bad redirect from digi4school
 pub struct LTIForm {
@@ -13,30 +13,6 @@ pub struct LTIForm {
     method: Method,
 
     data: HashMap<String, String>,
-}
-
-// TODO document
-// TODO remove all format! calls in expect
-// TODO remove if let that will be called on each runtime invocation
-macro_rules! form_attr_expect {
-    ( $form:expr, $attr:expr, $alias:expr ) => {{
-        let form = $form; // make sure to evaluate it
-        let alias = if !$alias.is_empty() {
-            format!(" ({})", $alias)
-        } else {
-            "".to_string()
-        };
-
-        form.attr($attr).expect(&*format!(
-            "{BAD_LTI_FORM_MESSAGE}form input didn't specify '{}'{}.\nHTML Element: {}",
-            $attr,
-            alias,
-            $form.html()
-        ))
-    }};
-    ( $form:expr, $attr:expr ) => {
-        form_attr_expect!($form, $attr, "")
-    };
 }
 
 impl LTIForm {
@@ -57,30 +33,33 @@ impl LTIForm {
                 "Found 2 valid HTML items for 'form#lti' css selector"
             );
             assert_eq!(
-                form_attr_expect!(
+                Self::expect_form_attr(
                     html_form,
                     "enctype", // originally 'encType' but for some reason scraper converts it to lowercase
                     "encoding"
                 ),
                 "application/x-www-form-urlencoded",
 
-                "{BAD_LTI_FORM_MESSAGE}Encoding Type is not 'application/x-www-form-urlencoded' but '{}'",
+                "{BAD_LTI_FORM_MESSAGE}: Encoding Type is not 'application/x-www-form-urlencoded' but '{}'",
                 html_form.attr("encType").unwrap()
             );
             assert_eq!(
-                form_attr_expect!(html_form, "name"),
+                Self::expect_form_attr(html_form, "name", ""),
                 "ltiLaunchForm",
                 "Not an LTI-form despite having an #lti id"
             );
 
             LTIForm {
-                url: Url::from_str(form_attr_expect!(html_form, "action", "url")).unwrap_or_else(
-                    |_| panic!("{BAD_LTI_FORM_MESSAGE}Invalid 'action' (url) specified"),
-                ),
+                url: Url::from_str(&Self::expect_form_attr(html_form, "action", "url"))
+                    .unwrap_or_else(|_| {
+                        panic!("{BAD_LTI_FORM_MESSAGE}: Invalid 'action' (url) specified")
+                    }),
 
                 // TODO remove `.to_upppercase()` - See https://github.com/hyperium/http/issues/681
-                method: Method::from_str(&form_attr_expect!(html_form, "method").to_uppercase())
-                    .unwrap(), // unwrap is fine because this can't actually fail (bad FromStr implementation)
+                method: Method::from_str(
+                    &Self::expect_form_attr(html_form, "method", "").to_uppercase(),
+                )
+                .unwrap(), // unwrap is fine because this can't actually fail (bad FromStr implementation)
 
                 data: html_form
                     .children()
@@ -88,8 +67,8 @@ impl LTIForm {
                         let element = ElementRef::wrap(node).unwrap();
 
                         Some((
-                            form_attr_expect!(element, "name").to_string(),
-                            form_attr_expect!(element, "value").to_string(),
+                            Self::expect_form_attr(element, "name", ""),
+                            Self::expect_form_attr(element, "value", ""),
                         ))
                     })
                     .collect::<Option<HashMap<String, String>>>()
@@ -122,5 +101,29 @@ impl LTIForm {
             .request(self.method, self.url)
             .header("Content-Type", "application/x-www-form-urlencoded")
             .body(serde_urlencoded::to_string(self.data).unwrap())
+    }
+
+    fn expect_form_attr(form_html: ElementRef, attribute: &str, alias: &str) -> String {
+        let panic_closure = || {
+            let alias = {
+                if !alias.is_empty() {
+                    format!(" ({})", alias)
+                } else {
+                    "".to_string()
+                }
+            };
+
+            panic!(
+                "{BAD_LTI_FORM_MESSAGE}: form input didn't specify '{}'{}.\nHTML Element: {}",
+                attribute,
+                alias,
+                form_html.html()
+            )
+        };
+
+        form_html
+            .attr(attribute)
+            .unwrap_or_else(panic_closure)
+            .to_string()
     }
 }

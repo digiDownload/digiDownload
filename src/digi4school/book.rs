@@ -52,7 +52,6 @@ impl Book {
     }
 
     pub async fn get_scraper(&self) -> Result<Box<dyn Scraper + '_>, reqwest::Error> {
-        // TODO expect number of redirects and parse LTI-form there to obtain url immediately (saves 1 redirect)
         let resp = self
             .follow_lti_form(
                 self.client

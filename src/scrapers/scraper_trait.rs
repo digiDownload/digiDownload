@@ -10,6 +10,8 @@ use std::fmt::Debug;
 use std::fs;
 use std::sync::Arc;
 
+// TODO change architecture to BaseScraper and then impl Scraper with SvgScraper etc
+
 #[async_trait]
 pub trait Scraper: Sync + Send + Debug {
     fn new_scraper(
@@ -27,7 +29,7 @@ pub trait Scraper: Sync + Send + Debug {
 
 #[async_trait]
 pub trait SvgScraper {
-    // TODO add documentation
+    /// get an unmodified svg directly from the page
     async fn get_page_raw_svg(&self, page: u16) -> Result<String, reqwest::Error>;
     fn get_image_request(&self, relative_url: &str) -> RequestBuilder;
 
@@ -40,9 +42,9 @@ pub trait SvgScraper {
         let url_regex = Regex::new(&format!("xlink:href=\"({}/.+?)\"/>", page)).unwrap();
         for capture in url_regex.captures_iter(&raw_svg) {
             // TODO add rayon iter??
-            let url = capture.get(1).expect("").as_str(); // TODO
+            let url = capture.get(1).unwrap().as_str();
 
-            // skip already downloaded images TODO: prevent from spawning 2 threads that then both save this ugh weoigjeiowjgoiwejoiwj
+            // skip already downloaded images TODO: prevent from spawning 2 threads that then both save this ugh
             if images.contains_key(url) {
                 continue;
             };
@@ -52,15 +54,24 @@ pub trait SvgScraper {
         }
 
         for (url, resp) in images {
-            println!("replaced {url} with ..."); // TODO rm
+            let content_type = {
+                let content_type_header = resp.headers().get("Content-Type").unwrap_or_else(|| {
+                    panic!(
+                        "No Content-Type specified on downloaded content: {}",
+                        resp.url().as_str()
+                    )
+                });
 
-            let content_type = resp
-                .headers()
-                .get("Content-Type")
-                .unwrap() // TODO
-                .to_str()
-                .unwrap() // TODO
-                .to_owned();
+                content_type_header
+                    .to_str()
+                    .unwrap_or_else(|_| {
+                        panic!(
+                            "Content-Type not according to http spec: {:?}",
+                            content_type_header
+                        )
+                    })
+                    .to_owned()
+            };
 
             svg = svg.replace(
                 url,
@@ -77,9 +88,7 @@ pub trait SvgScraper {
 
     async fn fetch_page_pdf(&self, page: u16) -> Result<Vec<u8>, reqwest::Error> {
         let svg = self.get_page_svg(page).await?;
-
-        fs::write("/tmp/digi/test.svg", &svg).unwrap(); // TODO
-
-        Ok(svg2pdf::convert_str(&svg, svg2pdf::Options::default()).expect(" ")) // TODO
+        fs::write("/tmp/digi/test.svg", &svg).unwrap(); // TODO remove
+        Ok(svg2pdf::convert_str(&svg, svg2pdf::Options::default()).expect("malformed svg found"))
     }
 }

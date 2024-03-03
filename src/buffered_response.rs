@@ -51,7 +51,7 @@ impl BufferedResponse {
 
         loop {
             if let Some(chunk) = resp.chunk().await? {
-                buf.append(&mut chunk.iter().copied().collect::<Vec<u8>>()); // TODO improve?
+                buf.append(&mut chunk.to_vec());
             } else {
                 buf.shrink_to_fit();
                 return Ok(buf);

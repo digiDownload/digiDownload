@@ -1,7 +1,7 @@
 use crate::buffered_response::BufferedResponse;
 use crate::digi4school::lti_form::LTIForm;
-use crate::scrapers::get_scraper_new_fn;
-use crate::scrapers::scraper_trait::Scraper;
+use crate::scraper::get_scraper_new_fn;
+use crate::scraper::scraper_trait::Scraper;
 use reqwest::{Client, Response};
 use std::sync::Arc;
 

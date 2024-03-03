@@ -1,14 +1,17 @@
 use crate::buffered_response::BufferedResponse;
 use crate::digi4school::book::Book;
-use crate::scrapers::digi4school::Digi4SchoolScraper;
-use crate::scrapers::scraper_trait::Scraper;
+use crate::scraper::base_scraper::BaseScraper;
+use crate::scraper::scraper_structs::digi4school::Digi4SchoolScraper;
+use crate::scraper::scraper_trait::Scraper;
 use crate::try_expect;
 use reqwest::{Client, Url};
 use std::sync::Arc;
 
 pub mod scraper_trait;
 
-mod digi4school;
+mod base_scraper;
+mod scraper_structs;
+mod svg_scraper;
 
 pub fn get_scraper_new_fn(
     url: &Url,

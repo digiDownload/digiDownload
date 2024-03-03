@@ -1,7 +1,9 @@
 use crate::buffered_response::BufferedResponse;
 use crate::digi4school::book::Book;
 use crate::regex;
-use crate::scrapers::scraper_trait::{Scraper, SvgScraper};
+use crate::scraper::base_scraper::BaseScraper;
+use crate::scraper::scraper_trait::Scraper;
+use crate::scraper::svg_scraper::SvgScraper;
 use async_trait::async_trait;
 use reqwest::{Client, RequestBuilder};
 use std::str::FromStr;
@@ -63,7 +65,7 @@ impl SvgScraper for Digi4SchoolScraper<'_> {
 }
 
 #[async_trait]
-impl Scraper for Digi4SchoolScraper<'_> {
+impl BaseScraper for Digi4SchoolScraper<'_> {
     fn new_scraper(
         book: &Book,
         client: Arc<Client>,
@@ -83,11 +85,5 @@ impl Scraper for Digi4SchoolScraper<'_> {
 
     async fn fetch_page_count(&self) -> Result<u16, reqwest::Error> {
         Ok(self.page_count)
-    }
-
-    async fn fetch_page_pdf(&self, page: u16) -> Result<Vec<u8>, reqwest::Error> {
-        Ok(SvgScraper::fetch_page_pdf(self, page).await?)
-
-        // TODO add digi4school 'bookmarks' as pdf navigation headers
     }
 }

@@ -6,7 +6,7 @@ use std::{env, fs};
 
 mod buffered_response;
 mod digi4school;
-mod scrapers;
+mod scraper;
 mod util;
 
 #[tokio::main]

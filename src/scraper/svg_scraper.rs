@@ -1,34 +1,17 @@
 use crate::buffered_response::BufferedResponse;
-use crate::digi4school::book::Book;
+use crate::scraper::base_scraper::BaseScraper;
+use crate::scraper::scraper_trait::Scraper;
 use async_trait::async_trait;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use regex::Regex;
-use reqwest::{Client, RequestBuilder};
+use reqwest::{Error, RequestBuilder};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs;
-use std::sync::Arc;
-
-// TODO change architecture to BaseScraper and then impl Scraper with SvgScraper etc
 
 #[async_trait]
-pub trait Scraper: Sync + Send + Debug {
-    fn new_scraper(
-        book: &Book,
-        client: Arc<Client>,
-        resp: BufferedResponse,
-    ) -> Box<dyn Scraper + '_>
-    where
-        Self: Sized;
-
-    async fn fetch_page_count(&self) -> Result<u16, reqwest::Error>;
-
-    async fn fetch_page_pdf(&self, page: u16) -> Result<Vec<u8>, reqwest::Error>; // pdf bytes
-}
-
-#[async_trait]
-pub trait SvgScraper {
+pub trait SvgScraper: BaseScraper + Sync + Send + Debug {
     /// get an unmodified svg directly from the page
     async fn get_page_raw_svg(&self, page: u16) -> Result<String, reqwest::Error>;
     fn get_image_request(&self, relative_url: &str) -> RequestBuilder;
@@ -90,5 +73,15 @@ pub trait SvgScraper {
         let svg = self.get_page_svg(page).await?;
         fs::write("/tmp/digi/test.svg", &svg).unwrap(); // TODO remove
         Ok(svg2pdf::convert_str(&svg, svg2pdf::Options::default()).expect("malformed svg found"))
+    }
+}
+
+#[async_trait]
+impl<T> Scraper for T
+where
+    T: SvgScraper,
+{
+    async fn fetch_page_pdf(&self, page: u16) -> Result<Vec<u8>, Error> {
+        SvgScraper::fetch_page_pdf(self, page).await
     }
 }

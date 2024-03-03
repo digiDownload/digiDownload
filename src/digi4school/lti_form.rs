@@ -55,7 +55,6 @@ impl LTIForm {
                         panic!("{BAD_LTI_FORM_MESSAGE}: Invalid 'action' (url) specified")
                     }),
 
-                // TODO remove `.to_upppercase()` - See https://github.com/hyperium/http/issues/681
                 method: Method::from_str(
                     &Self::expect_form_attr(html_form, "method", "").to_uppercase(),
                 )

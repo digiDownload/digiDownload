@@ -18,7 +18,7 @@ serde_urlencoded = "0.7.1"
 
 svg2pdf = "0.9.1"
 
-base64 = "0.21.7"
+base64 = "0.22.0"
 
 async-trait = "0.1.77"
 

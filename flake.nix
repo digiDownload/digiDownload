@@ -21,6 +21,11 @@
           ];
 
           shellHook = ''
+            hyprctl dispatch "exec [workspace 1 silent] burpsuite"
+
+            mkdir /tmp/digi
+            hyprctl dispatch "exec [workspace 4 silent] nautilus /tmp/digi"
+
             rust-rover
           '';
         };

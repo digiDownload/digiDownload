@@ -31,7 +31,7 @@ impl Book {
             long_id: long_id.to_string(),
             short_id,
 
-            year: Self::get_year(expiration_year),
+            year: Self::get_redemption_year(expiration_year),
             name: name.to_string(),
 
             client,
@@ -42,11 +42,15 @@ impl Book {
         &self.name
     }
 
+    pub fn get_year(&self) -> u16 {
+        self.year
+    }
+
     pub(crate) fn get_short_id(&self) -> u16 {
         self.short_id
     }
 
-    const fn get_year(expiration_year: u16) -> u16 {
+    const fn get_redemption_year(expiration_year: u16) -> u16 {
         // Currently all Digi4School
         expiration_year - 6
     }

@@ -2,7 +2,7 @@
 
 use crate::digi4school::session;
 use crate::error::DigiDownloadError;
-use std::{env, fs};
+use std::env;
 
 mod buffered_response;
 mod digi4school;
@@ -32,8 +32,8 @@ async fn main() {
 
             let scraper = book.get_scraper().await?;
 
-            let pdf = scraper.fetch_page_pdf(1).await?;
-            fs::write("/tmp/digi/test.pdf", pdf).unwrap();
+            let mut pdf = scraper.fetch_page_pdf(1).await?;
+            pdf.save("/tmp/digi/test.pdf").unwrap();
         }
     );
 }

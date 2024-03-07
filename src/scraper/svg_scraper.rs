@@ -81,7 +81,7 @@ impl<T> Scraper for T
 where
     T: SvgScraper,
 {
-    async fn fetch_page_pdf(&self, page: u16) -> Result<Vec<u8>, reqwest::Error> {
+    async fn fetch_page_raw_pdf(&self, page: u16) -> Result<Vec<u8>, reqwest::Error> {
         SvgScraper::fetch_page_pdf(self, page).await
     }
 }

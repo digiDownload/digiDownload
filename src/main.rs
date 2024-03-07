@@ -34,6 +34,13 @@ async fn main() {
 
             let mut pdf = scraper.fetch_page_pdf(1).await?;
             pdf.save("/tmp/digi/test.pdf").unwrap();
+
+            let mut full_pdf = scraper.download_book().await?;
+
+            full_pdf.prune_objects();
+            full_pdf.compress();
+
+            full_pdf.save("/tmp/digi/full.pdf").unwrap();
         }
     );
 }

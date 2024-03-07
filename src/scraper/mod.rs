@@ -12,6 +12,7 @@ pub mod scraper_trait;
 mod base_scraper;
 mod scraper_structs;
 mod svg_scraper;
+mod util;
 
 pub fn get_scraper_new_fn(
     url: &Url,

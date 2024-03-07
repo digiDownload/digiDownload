@@ -1,4 +1,5 @@
 #![feature(try_blocks, async_closure, lazy_cell)]
+#![allow(dead_code)]
 
 use crate::digi4school::session;
 use crate::error::DigiDownloadError;

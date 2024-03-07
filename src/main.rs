@@ -1,18 +1,19 @@
 #![feature(try_blocks, async_closure, lazy_cell)]
 
 use crate::digi4school::session;
-use crate::digi4school::session::LoginError;
+use crate::error::DigiDownloadError;
 use std::{env, fs};
 
 mod buffered_response;
 mod digi4school;
+mod error;
 mod scraper;
 mod util;
 
 #[tokio::main]
 async fn main() {
     try_expect!(
-        Result<(), LoginError>,
+        Result<(), DigiDownloadError>,
         &("Unable to reach the internet. ".to_owned() +
         if cfg!(feature = "route_burp") {
                 "Did you start BurpSuite?"

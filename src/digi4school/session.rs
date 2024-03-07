@@ -1,10 +1,9 @@
 use crate::digi4school::book::Book;
+use crate::error::LoginError;
 use crate::regex;
 use reqwest::{Certificate, Client, Proxy};
 use serde::Serialize;
-use std::fmt::Debug;
 use std::sync::Arc;
-use thiserror::Error;
 
 pub struct Session {
     client: Arc<Client>,
@@ -15,15 +14,6 @@ struct LoginData {
     email: String,
     password: String,
     indefinite: u8,
-}
-
-#[derive(Error, Debug)]
-pub enum LoginError {
-    #[error("Your login information was invalid")]
-    BadLogin,
-
-    #[error(transparent)]
-    ReqwestError(#[from] reqwest::Error),
 }
 
 impl Session {

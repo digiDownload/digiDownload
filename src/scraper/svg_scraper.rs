@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use regex::Regex;
-use reqwest::{Error, RequestBuilder};
+use reqwest::RequestBuilder;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs;
@@ -81,7 +81,7 @@ impl<T> Scraper for T
 where
     T: SvgScraper,
 {
-    async fn fetch_page_pdf(&self, page: u16) -> Result<Vec<u8>, Error> {
+    async fn fetch_page_pdf(&self, page: u16) -> Result<Vec<u8>, reqwest::Error> {
         SvgScraper::fetch_page_pdf(self, page).await
     }
 }

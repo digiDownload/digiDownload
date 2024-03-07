@@ -4,4 +4,5 @@ pub mod digi4school;
 pub mod scraper;
 
 mod buffered_response;
+mod error;
 mod util;

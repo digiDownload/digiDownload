@@ -14,9 +14,9 @@ mod scraper_structs;
 mod svg_scraper;
 mod util;
 
-pub fn get_scraper_new_fn(
+pub fn get_scraper_constructor(
     url: &Url,
-) -> fn(&Book, Arc<Client>, BufferedResponse) -> Box<dyn Scraper + '_> {
+) -> for<'a> fn(&'a Book, Arc<Client>, &'a BufferedResponse) -> Box<dyn Scraper + 'a> {
     let url = try_expect!(
         Option<_>,
         "Invalid URL passed: {}",

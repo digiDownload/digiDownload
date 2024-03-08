@@ -1,8 +1,9 @@
 use crate::digi4school::book::Book;
 use crate::error::LoginError;
 use crate::regex;
-use reqwest::{Certificate, Client, Proxy};
+use reqwest::{Certificate, Client, Proxy, Url};
 use serde::Serialize;
+use std::str::FromStr;
 use std::sync::Arc;
 
 pub struct Session {
@@ -17,7 +18,7 @@ struct LoginData {
 }
 
 impl Session {
-    const BASE_URL: &'static str = "https://digi4school.at";
+    pub(crate) const BASE_URL: &'static str = "https://digi4school.at";
 
     pub async fn new(email: String, password: String) -> Result<Self, LoginError> {
         let mut builder = Client::builder().cookie_store(true);
@@ -46,16 +47,17 @@ impl Session {
             .await?;
 
         Ok(regex!(
-            r"data-code='(.+?)' data-id='(\d+?)'.+?<h1>(.+?)</h1>.+?bis (\d{1,2}\.\d{1,2})\.(\d+)"
+            r"data-code='(.+?)' data-id='(\d+?)'.+?<img src='(.+?)'>.+?<h1>(.+?)</h1>.+?bis (\d{1,2}\.\d{1,2})\.(\d+)"
         )
         .captures_iter(&resp.text().await?)
-        .inspect(|m| assert_eq!(m.get(4).unwrap().as_str(), "31.10"))
+        .inspect(|m| assert_eq!(m.get(5).unwrap().as_str(), "31.10"))
         .map(|m| {
             Book::new(
                 m.get(1).unwrap().as_str(),
                 m.get(2).unwrap().as_str().parse().unwrap(),
-                m.get(5).unwrap().as_str().parse().unwrap(),
-                m.get(3).unwrap().as_str(),
+                m.get(6).unwrap().as_str().parse().unwrap(),
+                Url::from_str(m.get(3).unwrap().as_str()).unwrap(), // TODO expect
+                m.get(4).unwrap().as_str(),
                 self.client.clone(),
             )
         })
@@ -92,7 +94,7 @@ impl Session {
         match resp.as_str() {
             "OK" => Ok(()),
             "KO" => Err(LoginError::BadLogin),
-            _ => panic!(),
+            _ => unreachable!(),
         }
     }
 }

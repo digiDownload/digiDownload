@@ -66,11 +66,11 @@ impl SvgScraper for Digi4SchoolScraper<'_> {
 
 #[async_trait]
 impl BaseScraper for Digi4SchoolScraper<'_> {
-    fn new_scraper(
-        book: &Book,
+    fn new_scraper<'a>(
+        book: &'a Book,
         client: Arc<Client>,
-        resp: BufferedResponse,
-    ) -> Box<dyn '_ + Scraper>
+        resp: &'a BufferedResponse,
+    ) -> Box<dyn 'a + Scraper>
     where
         Self: Sized,
     {
@@ -79,7 +79,7 @@ impl BaseScraper for Digi4SchoolScraper<'_> {
             book, // https://users.rust-lang.org/t/fn-pointer-of-constructor-with-explicit-lifetimes/107439
             client,
 
-            page_count: Self::get_page_count(&resp),
+            page_count: Self::get_page_count(resp),
         })
     }
 

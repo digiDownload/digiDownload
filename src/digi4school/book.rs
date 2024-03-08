@@ -1,8 +1,9 @@
 use crate::buffered_response::BufferedResponse;
 use crate::digi4school::lti_form::LTIForm;
-use crate::scraper::get_scraper_new_fn;
-use crate::scraper::scraper_trait::Scraper;
-use reqwest::{Client, Response};
+use crate::digi4school::volume::Volume;
+use crate::regex;
+use reqwest::{Client, Response, Url};
+use std::str::FromStr;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
@@ -10,20 +11,23 @@ pub struct Book {
     long_id: String,
     short_id: u16,
 
-    /// Keeps track of the date at which the book was redeemed.
+    /// Keeps track of the date at which the book was obtained.
     /// Used to categorize the books in the user interface.
     year: u16,
     name: String,
+    thumbnail: Url,
 
     client: Arc<Client>,
 }
 
 // TODO refactor methods a bit and maybe replace getters with that one crate
 impl Book {
+    // TODO convert new to `fn new(resp: BufferedResponse) -> impl Iterator<Item = Self>`
     pub fn new(
         long_id: &str,
         short_id: u16,
         expiration_year: u16,
+        thumbnail: Url,
         name: &str,
         client: Arc<Client>,
     ) -> Self {
@@ -32,6 +36,7 @@ impl Book {
             short_id,
 
             year: Self::get_redemption_year(expiration_year),
+            thumbnail,
             name: name.to_string(),
 
             client,
@@ -46,8 +51,16 @@ impl Book {
         self.year
     }
 
+    pub fn get_thumbnail(&self) -> Url {
+        self.thumbnail.clone()
+    }
+
     pub(crate) fn get_short_id(&self) -> u16 {
         self.short_id
+    }
+
+    pub(crate) fn get_client(&self) -> Arc<Client> {
+        self.client.clone()
     }
 
     const fn get_redemption_year(expiration_year: u16) -> u16 {
@@ -55,7 +68,7 @@ impl Book {
         expiration_year - 6
     }
 
-    pub async fn get_scraper(&self) -> Result<Box<dyn Scraper + '_>, reqwest::Error> {
+    pub async fn get_volumes(&self) -> Result<Vec<Volume>, reqwest::Error> {
         let resp = self
             .follow_lti_form(
                 self.client
@@ -65,11 +78,32 @@ impl Book {
             )
             .await?;
 
-        Ok(get_scraper_new_fn(resp.url())(
-            self,
-            self.client.clone(),
-            resp,
-        ))
+        let text = resp.text();
+
+        // If the book is loaded directly it will always have a `<DOCTYPE html>` tag
+        // I can't guarantee that this will also hold true for all possible Scrapers so we check the URL
+        if resp.url().domain().unwrap() != "a.digi4school.at" || text.starts_with("<!DOCTYPE html>")
+        {
+            let volume = Volume::get_from_single_volume_book(self, resp);
+            Ok(vec![volume])
+        } else {
+            Ok(
+                regex!("<a( class=\"\")? href=\"(.+?)\" target=\"_blank\">.+?<img src=\"(.+?)\" />.+?<div class=\"tx\"><h1>(.+?)</h1></div>#")
+                    .captures_iter(&text)
+                    .map(|c| {
+                        Volume::new(
+                            // TODO fix relative URLs
+                            Url::from_str(c.get(2).unwrap().into()).unwrap(), // URL
+                            c.get(3).unwrap().into(), // name
+                            Url::from_str(c.get(4).unwrap().into()).unwrap(), // thumbnail
+
+                            self,
+                            self.client.clone()
+                        )
+                    })
+                    .collect()
+            )
+        }
     }
 
     async fn follow_lti_form(&self, resp: Response) -> Result<BufferedResponse, reqwest::Error> {

@@ -31,15 +31,19 @@ async fn main() {
             let books = client.get_books().await.unwrap();
             let book = &books[0];
 
-            let scraper = book.get_scraper().await?;
+            for book in books.iter() {
+                let volumes = book.get_volumes().await?;
 
-            let mut pdf = scraper.fetch_page_pdf(1).await?;
-            pdf.save("/tmp/digi/test.pdf").unwrap();
+                for volume in volumes {
+                    let mut page = volume.get_scraper().await?.fetch_page_pdf(1).await?;
+                    page.save(format!("/tmp/digi/{}.pdf", book.get_short_id())).unwrap();
+                }
+            };
+
+            let volume = book.get_volumes().await?;
+            let scraper = volume[0].get_scraper().await?;
 
             let mut full_pdf = scraper.download_book().await?;
-
-            full_pdf.prune_objects();
-            full_pdf.compress();
 
             full_pdf.save("/tmp/digi/full.pdf").unwrap();
         }

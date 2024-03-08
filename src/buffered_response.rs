@@ -5,6 +5,7 @@ use std::ops::Deref;
 /// Stores a response and keeps track of its body in one type.
 /// Circumvents consumption of Response by `.text()` or `.bytes()`
 /// Does not lazily load the body -> Use only use if you are sure you need the text
+#[derive(Debug)]
 pub struct BufferedResponse {
     resp: Response,
     buf: Vec<u8>,

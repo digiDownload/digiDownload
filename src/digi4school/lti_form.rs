@@ -16,6 +16,16 @@ pub struct LTIForm {
 }
 
 impl LTIForm {
+    pub async fn follow(
+        resp: BufferedResponse,
+        client: &Client,
+    ) -> Result<BufferedResponse, reqwest::Error> {
+        Ok(match LTIForm::new(&resp) {
+            Some(form) => form.follow_recursively(client).await?,
+            None => resp,
+        })
+    }
+
     #[allow(clippy::question_mark)] // TODO remove. See https://github.com/rust-lang/rust-clippy/issues/12337
     pub fn new(raw_form: &BufferedResponse) -> Option<Self> {
         let doc = Html::parse_document(&raw_form.text());

@@ -1,6 +1,6 @@
 use reqwest::Response;
-use std::cell::Cell;
 use std::ops::Deref;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Stores a response and keeps track of its body in one type.
 /// Circumvents consumption of Response by `.text()` or `.bytes()`
@@ -10,7 +10,7 @@ pub struct BufferedResponse {
     resp: Response,
     buf: Vec<u8>,
 
-    utf8_check_passed: Cell<bool>,
+    utf8_check_passed: AtomicBool,
 }
 
 impl BufferedResponse {
@@ -21,17 +21,17 @@ impl BufferedResponse {
             resp,
             buf,
 
-            utf8_check_passed: Cell::new(false),
+            utf8_check_passed: AtomicBool::new(false),
         })
     }
 
     pub fn text(&self) -> String {
-        if self.utf8_check_passed.get() {
+        if self.utf8_check_passed.load(Ordering::Acquire) {
             unsafe { return String::from_utf8_unchecked(self.buf.clone()) }
         }
 
         let result = String::from_utf8(self.buf.clone()).expect("expected charset to be utf8");
-        self.utf8_check_passed.set(true);
+        self.utf8_check_passed.store(true, Ordering::Release);
         result
     }
 

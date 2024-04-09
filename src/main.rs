@@ -29,15 +29,10 @@ async fn main() {
             ).await?;
 
             let books = client.get_books().await.unwrap();
-            let book = &books[0];
+            let book = &books[1];
 
-            for book in books.iter() {
-                let volumes = book.get_volumes().await?;
-
-                for volume in volumes {
-                    let mut page = volume.get_scraper().await?.fetch_page_pdf(1).await?;
-                    page.save(format!("/tmp/digi/{}.pdf", book.get_short_id())).unwrap();
-                }
+            for (i, book) in books.iter().enumerate() {
+                println!("Book {i}: {}", book.title())
             };
 
             let volume = book.get_volumes().await?;

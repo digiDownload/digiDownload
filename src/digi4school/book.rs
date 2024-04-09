@@ -1,28 +1,35 @@
 use crate::buffered_response::BufferedResponse;
 use crate::digi4school::lti_form::LTIForm;
+use crate::digi4school::session::Session;
 use crate::digi4school::volume::Volume;
 use crate::regex;
-use reqwest::{Client, Response, Url};
+use getset::{CopyGetters, Getters};
+use reqwest::{Client, Url};
 use std::str::FromStr;
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Getters, CopyGetters)]
 pub struct Book {
     long_id: String,
+    #[getset(get_copy = "pub(crate)")]
     short_id: u16,
 
     /// Keeps track of the date at which the book was obtained.
     /// Used to categorize the books in the user interface.
+    #[getset(get_copy = "pub")]
     year: u16,
-    name: String,
+    #[getset(get = "pub")]
+    title: String,
+    #[getset(get = "pub")]
     thumbnail: Url,
 
     client: Arc<Client>,
 }
 
-// TODO refactor methods a bit and maybe replace getters with that one crate
 impl Book {
-    // TODO convert new to `fn new(resp: BufferedResponse) -> impl Iterator<Item = Self>`
+    const DOMAIN: &'static str = "a.digi4school.at";
+    const BASE_URL: &'static str = "https://a.digi4school.at";
+
     pub fn new(
         long_id: &str,
         short_id: u16,
@@ -37,30 +44,57 @@ impl Book {
 
             year: Self::get_redemption_year(expiration_year),
             thumbnail,
-            name: name.to_string(),
+            title: name.to_string(),
 
             client,
         }
     }
 
-    pub fn get_name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn get_year(&self) -> u16 {
-        self.year
-    }
-
-    pub fn get_thumbnail(&self) -> Url {
-        self.thumbnail.clone()
-    }
-
-    pub(crate) fn get_short_id(&self) -> u16 {
-        self.short_id
-    }
-
-    pub(crate) fn get_client(&self) -> Arc<Client> {
+    pub(crate) fn client(&self) -> Arc<Client> {
         self.client.clone()
+    }
+
+    pub async fn get_volumes(&self) -> Result<Vec<Volume>, reqwest::Error> {
+        let resp = LTIForm::follow(
+            BufferedResponse::new(
+                self.client
+                    .get(format!("{}/ebook/{}", Session::BASE_URL, self.long_id))
+                    .send()
+                    .await?,
+            )
+            .await?,
+            &self.client,
+        )
+        .await?;
+
+        let text = resp.text();
+
+        // If the book is loaded directly it will always have a `<DOCTYPE html>` tag
+        // I can't guarantee that this will also hold true for all possible Scrapers so we check the URL
+        if resp.url().domain().unwrap() != Self::DOMAIN || text.starts_with("<!DOCTYPE html>") {
+            let volume = Volume::get_from_single_volume_book(self, resp);
+            Ok(vec![volume])
+        } else {
+            // TODO this is cheap af
+            let text = text.replace('\n', " "); // get regex to match newlines'
+
+            let volumes: Vec<Volume> = regex!(r#"<a( class="")? href="(.+?)" target="_blank">.+?<img src="(.+?)" />.+?<div class="tx"><h1>(.+?)</h1></div>"#)
+                    .captures_iter(&text)
+                    .map(|c| {
+                        Volume::new(
+                            // TODO fix relative URLs ?????? Wtf did I mean
+                            Url::from_str(&format!("{}/{}", self.relative_url(), c.get(2).unwrap().as_str())).unwrap(), // URL
+                            c.get(3).unwrap().into(), // name
+                            Url::from_str(&format!("{}/{}", self.relative_url(), c.get(4).unwrap().as_str())).unwrap(), // thumbnail
+
+                            self.client.clone()
+                        )
+                    })
+                    .collect();
+
+            assert!(!volumes.is_empty());
+            Ok(volumes)
+        }
     }
 
     const fn get_redemption_year(expiration_year: u16) -> u16 {
@@ -68,50 +102,7 @@ impl Book {
         expiration_year - 6
     }
 
-    pub async fn get_volumes(&self) -> Result<Vec<Volume>, reqwest::Error> {
-        let resp = self
-            .follow_lti_form(
-                self.client
-                    .get(format!("https://digi4school.at/ebook/{}", self.long_id))
-                    .send()
-                    .await?,
-            )
-            .await?;
-
-        let text = resp.text();
-
-        // If the book is loaded directly it will always have a `<DOCTYPE html>` tag
-        // I can't guarantee that this will also hold true for all possible Scrapers so we check the URL
-        if resp.url().domain().unwrap() != "a.digi4school.at" || text.starts_with("<!DOCTYPE html>")
-        {
-            let volume = Volume::get_from_single_volume_book(self, resp);
-            Ok(vec![volume])
-        } else {
-            Ok(
-                regex!("<a( class=\"\")? href=\"(.+?)\" target=\"_blank\">.+?<img src=\"(.+?)\" />.+?<div class=\"tx\"><h1>(.+?)</h1></div>#")
-                    .captures_iter(&text)
-                    .map(|c| {
-                        Volume::new(
-                            // TODO fix relative URLs
-                            Url::from_str(c.get(2).unwrap().into()).unwrap(), // URL
-                            c.get(3).unwrap().into(), // name
-                            Url::from_str(c.get(4).unwrap().into()).unwrap(), // thumbnail
-
-                            self,
-                            self.client.clone()
-                        )
-                    })
-                    .collect()
-            )
-        }
-    }
-
-    async fn follow_lti_form(&self, resp: Response) -> Result<BufferedResponse, reqwest::Error> {
-        let resp = BufferedResponse::new(resp).await?;
-
-        Ok(match LTIForm::new(&resp) {
-            Some(form) => form.follow_recursively(&self.client).await?,
-            None => resp,
-        })
+    fn relative_url(&self) -> String {
+        format!("{}/ebook/{}", Self::BASE_URL, self.short_id)
     }
 }

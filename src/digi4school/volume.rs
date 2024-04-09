@@ -1,29 +1,28 @@
 use crate::buffered_response::BufferedResponse;
 use crate::digi4school::book::Book;
+use crate::digi4school::lti_form::LTIForm;
 use crate::scraper::get_scraper_constructor;
 use crate::scraper::scraper_trait::Scraper;
+use getset::Getters;
 use reqwest::{Client, Url};
+use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, OnceLock};
 
-pub struct Volume<'a> {
+#[derive(Getters)]
+pub struct Volume {
     url: Url,
     resp: OnceLock<BufferedResponse>,
 
+    #[getset(get = "pub")]
     name: String,
+    #[getset(get = "pub")]
     thumbnail: Url,
 
-    book: &'a Book,
     client: Arc<Client>,
 }
 
-impl<'a> Volume<'a> {
-    pub(crate) fn new(
-        url: Url,
-        name: &str,
-        thumbnail: Url,
-        book: &'a Book,
-        client: Arc<Client>,
-    ) -> Self {
+impl Volume {
+    pub(crate) fn new(url: Url, name: &str, thumbnail: Url, client: Arc<Client>) -> Self {
         Self {
             url,
             resp: OnceLock::default(),
@@ -31,7 +30,6 @@ impl<'a> Volume<'a> {
             name: name.to_string(),
             thumbnail,
 
-            book,
             client,
         }
     }
@@ -41,21 +39,19 @@ impl<'a> Volume<'a> {
             url: resp.url().clone(),
             resp: OnceLock::from(resp),
 
-            name: book.get_name().to_string(),
-            thumbnail: book.get_thumbnail(),
+            name: book.title().to_string(),
+            thumbnail: book.thumbnail().clone(),
 
-            book,
-            client: book.get_client(),
+            client: book.client(),
         }
     }
 
     pub async fn get_scraper(&self) -> Result<Box<dyn Scraper + '_>, reqwest::Error> {
-        self.gen_response().await?;
+        let resp = self.get_response().await?;
 
-        Ok(get_scraper_constructor(&self.url)(
-            self.book,
+        Ok(get_scraper_constructor(resp.url())(
+            resp,
             self.client.clone(),
-            self.get_response().await?,
         ))
     }
 
@@ -70,14 +66,25 @@ impl<'a> Volume<'a> {
     }
 
     async fn gen_response(&self) -> Result<(), reqwest::Error> {
-        if self.resp.get().is_some() {
-            return Ok(());
+        if self.resp.get().is_none() {
+            self.resp
+                .set(
+                    LTIForm::follow(
+                        BufferedResponse::new(self.client.get(self.url.clone()).send().await?)
+                            .await?,
+                        &self.client,
+                    )
+                    .await?,
+                )
+                .unwrap();
         }
 
-        self.resp
-            .set(BufferedResponse::new(self.client.get(self.url.clone()).send().await?).await?)
-            .unwrap(); // TODO ???
-
         Ok(())
+    }
+}
+
+impl Debug for Volume {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.url.as_str())
     }
 }

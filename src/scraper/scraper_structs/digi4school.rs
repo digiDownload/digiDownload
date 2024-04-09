@@ -1,28 +1,23 @@
 use crate::buffered_response::BufferedResponse;
-use crate::digi4school::book::Book;
 use crate::regex;
 use crate::scraper::base_scraper::BaseScraper;
 use crate::scraper::scraper_trait::Scraper;
 use crate::scraper::svg_scraper::SvgScraper;
 use async_trait::async_trait;
-use reqwest::{Client, RequestBuilder};
+use reqwest::{Client, RequestBuilder, Url};
 use std::str::FromStr;
 use std::sync::Arc;
 
 #[derive(Debug)]
-pub struct Digi4SchoolScraper<'a> {
-    book: &'a Book,
-    client: Arc<Client>,
-
+pub struct Digi4SchoolScraper {
+    base_url: Url,
     page_count: u16,
+
+    client: Arc<Client>,
 }
 
-impl<'a> Digi4SchoolScraper<'a> {
+impl Digi4SchoolScraper {
     pub const URL: &'static str = "https://a.digi4school.at";
-
-    fn get_book_url(&self) -> String {
-        format!("{}/ebook/{}", Self::URL, self.book.get_short_id())
-    }
 
     /// Takes first response from the `LTIForm` redirects as an input
     fn get_page_count(resp: &BufferedResponse) -> u16 {
@@ -46,7 +41,7 @@ impl<'a> Digi4SchoolScraper<'a> {
 }
 
 #[async_trait]
-impl SvgScraper for Digi4SchoolScraper<'_> {
+impl SvgScraper for Digi4SchoolScraper {
     async fn get_page_raw_svg(&self, page: u16) -> Result<String, reqwest::Error> {
         assert!(
             page <= self.page_count,
@@ -54,32 +49,35 @@ impl SvgScraper for Digi4SchoolScraper<'_> {
             self.page_count
         );
 
-        let url = format!("{}/{page}.svg", self.get_book_url());
+        let url = format!("{}/{page}.svg", self.base_url);
         Ok(self.client.get(url).send().await?.text().await?)
     }
 
     fn get_image_request(&self, relative_url: &str) -> RequestBuilder {
-        let url = format!("{}/{}", self.get_book_url(), relative_url);
+        let url = format!("{}/{}", self.base_url, relative_url);
         self.client.get(url)
     }
 }
 
 #[async_trait]
-impl BaseScraper for Digi4SchoolScraper<'_> {
-    fn new_scraper<'a>(
-        book: &'a Book,
-        client: Arc<Client>,
-        resp: &'a BufferedResponse,
-    ) -> Box<dyn 'a + Scraper>
+impl BaseScraper for Digi4SchoolScraper {
+    fn new_scraper<'a>(resp: &'a BufferedResponse, client: Arc<Client>) -> Box<dyn 'a + Scraper>
     where
         Self: Sized,
     {
-        Box::new(Digi4SchoolScraper {
-            // TODO understand why Digi4SchoolScraper is different from Self
-            book, // https://users.rust-lang.org/t/fn-pointer-of-constructor-with-explicit-lifetimes/107439
-            client,
+        let base_url = resp.url().as_str().trim_end_matches("/index.html");
 
+        Box::new(Digi4SchoolScraper {
+            base_url: Url::parse(base_url).unwrap_or_else(|_| {
+                panic!(
+                    "Bad base_url supplied: {}.\nResponse URL: {}",
+                    base_url,
+                    resp.url()
+                )
+            }),
             page_count: Self::get_page_count(resp),
+
+            client,
         })
     }
 

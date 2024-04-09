@@ -23,3 +23,4 @@ base64 = "0.22.0"
 
 async-trait = "0.1.77"
 thiserror = "1.0.57"
+getset = "0.1.2"

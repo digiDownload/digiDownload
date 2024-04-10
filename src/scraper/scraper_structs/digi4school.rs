@@ -17,7 +17,7 @@ pub struct Digi4SchoolScraper {
 }
 
 impl Digi4SchoolScraper {
-    pub const URL: &'static str = "https://a.digi4school.at";
+    pub const DOMAIN: &'static str = "a.digi4school.at";
 
     /// Takes first response from the `LTIForm` redirects as an input
     fn get_page_count(resp: &BufferedResponse) -> u16 {

@@ -8,7 +8,6 @@ use regex::Regex;
 use reqwest::RequestBuilder;
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::fs;
 
 #[async_trait]
 pub trait SvgScraper: BaseScraper + Sync + Send + Debug {
@@ -23,24 +22,22 @@ pub trait SvgScraper: BaseScraper + Sync + Send + Debug {
         let mut images = HashMap::new();
 
         let url_regex = Regex::new(&format!("xlink:href=\"({}/.+?)\"/>", page)).unwrap();
+        // TODO add rayon iter
         for capture in url_regex.captures_iter(&raw_svg) {
-            // TODO add rayon iter??
             let url = capture.get(1).unwrap().as_str();
 
-            // skip already downloaded images TODO: prevent from spawning 2 threads that then both save this ugh
-            if images.contains_key(url) {
-                continue;
+            // skip already downloaded images
+            if !images.contains_key(url) {
+                let resp = BufferedResponse::new(self.get_image_request(url).send().await?).await?;
+                images.insert(url, resp);
             };
-
-            let resp = BufferedResponse::new(self.get_image_request(url).send().await?).await?;
-            images.insert(url, resp);
         }
 
         for (url, resp) in images {
             let content_type = {
                 let content_type_header = resp.headers().get("Content-Type").unwrap_or_else(|| {
                     panic!(
-                        "No Content-Type specified on downloaded content: {}",
+                        "No Content-Type specified for downloaded content: {}",
                         resp.url().as_str()
                     )
                 });
@@ -49,7 +46,7 @@ pub trait SvgScraper: BaseScraper + Sync + Send + Debug {
                     .to_str()
                     .unwrap_or_else(|_| {
                         panic!(
-                            "Content-Type not according to http spec: {:?}",
+                            "Content-Type is not a valid string: {:?}",
                             content_type_header
                         )
                     })
@@ -71,7 +68,6 @@ pub trait SvgScraper: BaseScraper + Sync + Send + Debug {
 
     async fn fetch_page_pdf(&self, page: u16) -> Result<Vec<u8>, reqwest::Error> {
         let svg = self.get_page_svg(page).await?;
-        fs::write("/tmp/digi/test.svg", &svg).unwrap(); // TODO remove
         Ok(svg2pdf::convert_str(&svg, svg2pdf::Options::default()).expect("malformed svg found"))
     }
 }

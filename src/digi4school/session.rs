@@ -34,8 +34,8 @@ impl Session {
         let session = Self {
             client: Arc::new(builder.build().unwrap()),
         };
-
         session.login(email, password, false).await?;
+
         Ok(session)
     }
 
@@ -46,26 +46,27 @@ impl Session {
             .send()
             .await?;
 
-        Ok(regex!(
-            r"data-code='(.+?)' data-id='(\d+?)'.+?<img src='(.+?)'>.+?<h1>(.+?)</h1>.+?bis (\d{1,2}\.\d{1,2})\.(\d+)"
-        )
-        .captures_iter(&resp.text().await?)
-        .inspect(|m| assert_eq!(m.get(5).unwrap().as_str(), "31.10"))
-        .map(|m| {
-            Book::new(
-                m.get(1).unwrap().as_str(),
-                m.get(2).unwrap().as_str().parse().unwrap(),
-                m.get(6).unwrap().as_str().parse().unwrap(),
-                Url::from_str(m.get(3).unwrap().as_str()).unwrap(), // TODO expect
-                m.get(4).unwrap().as_str(),
-                self.client.clone(),
+        Ok(
+            regex!(
+                r"data-code='(.+?)' data-id='(\d+?)'.+?<img src='(.+?)'>.+?<h1>(.+?)</h1>.+?bis (\d{1,2}\.\d{1,2})\.(\d+)"
             )
-        })
-        .collect())
+            .captures_iter(&resp.text().await?)
+            .inspect(|m| assert_eq!(m.get(5).unwrap().as_str(), "31.10"))
+            .map(|m| {
+                Book::new(
+                    m.get(2).unwrap().as_str().parse().unwrap(), // id
+                    m.get(6).unwrap().as_str().parse().unwrap(), // expiration year
+                    Url::from_str(m.get(3).unwrap().as_str()).expect("Thumbnail URL is invalid"), // thumbnail
+                    m.get(4).unwrap().as_str(), // title
+                    
+                    self.client.clone(),
+                )
+            })
+            .collect())
     }
 
     pub fn redeem_code(&self) -> bool {
-        todo!() // Program once I can test redeeming a code
+        todo!("Program once I can test redeeming a code")
     }
 
     async fn login(
@@ -74,7 +75,7 @@ impl Session {
         password: String,
         remember_login: bool,
     ) -> Result<(), LoginError> {
-        let resp = self
+        let resp_content = self
             .client
             .post(format!("{}/br/xhr/login", Self::BASE_URL))
             .header("Content-Type", "application/x-www-form-urlencoded")
@@ -91,10 +92,10 @@ impl Session {
             .text()
             .await?;
 
-        match resp.as_str() {
+        match resp_content.as_str() {
             "OK" => Ok(()),
             "KO" => Err(LoginError::BadLogin),
-            _ => unreachable!(),
+            _ => panic!("Bad login-form response: {}", resp_content),
         }
     }
 }

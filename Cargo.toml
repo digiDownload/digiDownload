@@ -10,6 +10,10 @@ route_burp = []
 [profile.dev]
 opt-level = 1
 
+[profile.release]
+strip = true
+lto = true
+
 [dependencies]
 reqwest = { version = "0.12.3", features = ["cookies"] }
 tokio = { version = "1.36.0", features = ["rt", "rt-multi-thread", "macros"] }

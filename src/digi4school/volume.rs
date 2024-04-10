@@ -5,7 +5,6 @@ use crate::scraper::get_scraper_constructor;
 use crate::scraper::scraper_trait::Scraper;
 use getset::Getters;
 use reqwest::{Client, Url};
-use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, OnceLock};
 
 #[derive(Getters)]
@@ -34,7 +33,7 @@ impl Volume {
         }
     }
 
-    pub(crate) fn get_from_single_volume_book(book: &Book, resp: BufferedResponse) -> Volume {
+    pub(crate) fn from_single_volume_book(book: &Book, resp: BufferedResponse) -> Self {
         Volume {
             url: resp.url().clone(),
             resp: OnceLock::from(resp),
@@ -80,11 +79,5 @@ impl Volume {
         }
 
         Ok(())
-    }
-}
-
-impl Debug for Volume {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.url.as_str())
     }
 }

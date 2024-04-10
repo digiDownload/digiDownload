@@ -26,7 +26,6 @@ Contributions are encouraged. Use Github to its fullest. PRs, Issues, etc are al
 
 - [ ] Implement asynchronous downloads.
 - [ ] Expand the scraping capabilities.
-- [ ] Develop a caching mechanism.
 - [ ] Optimize PDF merging.
 - [ ] Introduce a method for redeeming codes.
 - [ ] Address existing `TODO` comments in the code.

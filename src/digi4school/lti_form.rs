@@ -1,6 +1,6 @@
 use crate::buffered_response::BufferedResponse;
 use crate::try_expect;
-use reqwest::{Client, Method, RequestBuilder, Url};
+use reqwest::{Client, Method, Url};
 use scraper::{ElementRef, Html, Selector};
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -8,11 +8,11 @@ use std::str::FromStr;
 const BAD_LTI_FORM_MESSAGE: &str = "Bad LTI-form";
 
 /// LTI-form is just a bad redirect from digi4school
-pub struct LTIForm {
+pub(crate) struct LTIForm {
     url: Url,
     method: Method,
 
-    data: HashMap<String, String>,
+    form_data: HashMap<String, String>,
 }
 
 impl LTIForm {
@@ -26,7 +26,6 @@ impl LTIForm {
         })
     }
 
-    #[allow(clippy::question_mark)] // TODO remove. See https://github.com/rust-lang/rust-clippy/issues/12337
     pub fn new(raw_form: &BufferedResponse) -> Option<Self> {
         let doc = Html::parse_document(&raw_form.text());
         let selector = Selector::parse("form#lti").unwrap();
@@ -40,7 +39,7 @@ impl LTIForm {
 
             assert!(
                 iter.next().is_none(),
-                "Found 2 valid HTML items for 'form#lti' css selector"
+                "{BAD_LTI_FORM_MESSAGE}: Found 2 valid HTML items for 'form#lti' css selector"
             );
             assert_eq!(
                 Self::expect_form_attr(
@@ -56,13 +55,14 @@ impl LTIForm {
             assert_eq!(
                 Self::expect_form_attr(html_form, "name", ""),
                 "ltiLaunchForm",
-                "Not an LTI-form despite having an #lti id"
+
+                "{BAD_LTI_FORM_MESSAGE}: Does not have `ltiLaunchForm` name, despite having an #lti id"
             );
 
             LTIForm {
                 url: Url::from_str(&Self::expect_form_attr(html_form, "action", "url"))
                     .unwrap_or_else(|_| {
-                        panic!("{BAD_LTI_FORM_MESSAGE}: Invalid 'action' (url) specified")
+                        panic!("{BAD_LTI_FORM_MESSAGE}: header 'action' (url) is not a URL")
                     }),
 
                 method: Method::from_str(
@@ -70,7 +70,7 @@ impl LTIForm {
                 )
                 .unwrap(), // unwrap is fine because this can't actually fail (bad FromStr implementation)
 
-                data: html_form
+                form_data: html_form
                     .children()
                     .map(|node| {
                         let element = ElementRef::wrap(node).unwrap();
@@ -94,7 +94,7 @@ impl LTIForm {
 
         // loop because recursive async functions are cursed
         loop {
-            let resp = BufferedResponse::new(form.build_request(client).send().await?).await?;
+            let resp = form.send(client).await?;
 
             form = match LTIForm::new(&resp) {
                 Some(form) => form,
@@ -105,11 +105,16 @@ impl LTIForm {
         }
     }
 
-    pub fn build_request(self, client: &Client) -> RequestBuilder {
-        client
-            .request(self.method, self.url)
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .body(serde_urlencoded::to_string(self.data).unwrap())
+    async fn send(self, client: &Client) -> Result<BufferedResponse, reqwest::Error> {
+        BufferedResponse::new(
+            client
+                .request(self.method, self.url)
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .body(serde_urlencoded::to_string(self.form_data).unwrap())
+                .send()
+                .await?,
+        )
+        .await
     }
 
     fn expect_form_attr(form_html: ElementRef, attribute: &str, alias: &str) -> String {

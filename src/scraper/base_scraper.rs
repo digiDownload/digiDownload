@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 #[async_trait]
 pub trait BaseScraper {
-    fn new_scraper<'a>(resp: &'a BufferedResponse, client: Arc<Client>) -> Box<dyn Scraper + 'a>
+    fn new_scraper(resp: Arc<BufferedResponse>, client: Arc<Client>) -> Box<dyn Scraper>
     where
         Self: Sized;
 

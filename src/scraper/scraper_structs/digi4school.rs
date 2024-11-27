@@ -61,7 +61,7 @@ impl SvgScraper for Digi4SchoolScraper {
 
 #[async_trait]
 impl BaseScraper for Digi4SchoolScraper {
-    fn new_scraper<'a>(resp: &'a BufferedResponse, client: Arc<Client>) -> Box<dyn 'a + Scraper>
+    fn new_scraper(resp: Arc<BufferedResponse>, client: Arc<Client>) -> Box<dyn Scraper>
     where
         Self: Sized,
     {
@@ -75,7 +75,7 @@ impl BaseScraper for Digi4SchoolScraper {
                     resp.url()
                 )
             }),
-            page_count: Self::get_page_count(resp),
+            page_count: Self::get_page_count(&resp),
 
             client,
         })

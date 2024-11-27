@@ -9,7 +9,7 @@ pub mod digi4school;
 
 pub fn get_scraper_constructor(
     url: &Url,
-) -> for<'a> fn(&'a BufferedResponse, Arc<Client>) -> Box<dyn Scraper + 'a> {
+) -> fn(Arc<BufferedResponse>, Arc<Client>) -> Box<dyn Scraper> {
     match url.domain().unwrap_or_else(|| panic!("Bad URL supplied: {url}")) {
         Digi4SchoolScraper::DOMAIN => Digi4SchoolScraper::new_scraper,
 

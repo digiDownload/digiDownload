@@ -11,7 +11,7 @@ use std::sync::{Arc, OnceLock};
 #[derive(Getters)]
 pub struct Volume {
     url: Url,
-    resp: OnceLock<BufferedResponse>,
+    resp: OnceLock<Arc<BufferedResponse>>,
 
     #[getset(get = "pub")]
     name: String,
@@ -37,7 +37,7 @@ impl Volume {
     pub(crate) fn from_single_volume_book(book: &Book, resp: BufferedResponse) -> Self {
         Volume {
             url: resp.url().clone(),
-            resp: OnceLock::from(resp),
+            resp: OnceLock::from(Arc::new(resp)),
 
             name: book.title().to_string(),
             thumbnail: book.thumbnail().clone(),
@@ -46,7 +46,7 @@ impl Volume {
         }
     }
 
-    pub async fn get_scraper(&self) -> Result<Box<dyn Scraper + '_>, reqwest::Error> {
+    pub async fn get_scraper(&self) -> Result<Box<dyn Scraper>, reqwest::Error> {
         let resp = self.get_response().await?;
 
         Ok(get_scraper_constructor(resp.url())(
@@ -55,12 +55,12 @@ impl Volume {
         ))
     }
 
-    async fn get_response(&self) -> Result<&BufferedResponse, reqwest::Error> {
+    async fn get_response(&self) -> Result<Arc<BufferedResponse>, reqwest::Error> {
         match self.resp.get() {
-            Some(resp) => Ok(resp),
+            Some(resp) => Ok(resp.clone()),
             None => {
                 self.gen_response().await?;
-                Ok(self.resp.get().unwrap())
+                Ok(self.resp.get().unwrap().clone())
             }
         }
     }
@@ -68,14 +68,14 @@ impl Volume {
     async fn gen_response(&self) -> Result<(), reqwest::Error> {
         if self.resp.get().is_none() {
             self.resp
-                .set(
+                .set(Arc::new(
                     LTIForm::follow(
                         BufferedResponse::new(self.client.get(self.url.clone()).send().await?)
                             .await?,
                         &self.client,
                     )
                     .await?,
-                )
+                ))
                 .unwrap();
         }
 

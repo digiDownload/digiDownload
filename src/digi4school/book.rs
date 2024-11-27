@@ -5,6 +5,7 @@ use crate::regex_builder;
 use getset::{CopyGetters, Getters};
 use regex::RegexBuilder;
 use reqwest::{Client, Url};
+use std::fmt::Display;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -102,5 +103,11 @@ impl Book {
 
     fn base_url(&self) -> String {
         format!("{}/ebook/{}", Self::BASE_URL, self.id)
+    }
+}
+
+impl Display for Book {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("({}) {}", self.year(), self.title()))
     }
 }

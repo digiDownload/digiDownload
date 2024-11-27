@@ -5,6 +5,7 @@ use crate::scraper::get_scraper_constructor;
 use crate::scraper::scraper_trait::Scraper;
 use getset::Getters;
 use reqwest::{Client, Url};
+use std::fmt::Display;
 use std::sync::{Arc, OnceLock};
 
 #[derive(Getters)]
@@ -79,5 +80,11 @@ impl Volume {
         }
 
         Ok(())
+    }
+}
+
+impl Display for Volume {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.name)
     }
 }

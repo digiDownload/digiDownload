@@ -68,14 +68,14 @@ impl Book {
         } else {
             let volumes: Vec<Volume> = regex_builder!(
                     RegexBuilder::new(
-                        r#"<a( class="")? href="(.+?)" target="_blank">.+?<img src="(.+?)" />.+?<div class="tx"><h1>(.+?)</h1></div>"#
+                        r#"<a( class="")? href="(.+?)" target="_blank">[\s\S]+?<img src="(.+?)" />[\s\S]+?<div class="tx"><h1>(.+?)</h1></div>"#
                     ).dot_matches_new_line(true)
                 ).captures_iter(&resp.text())
                 .map(|c| {
                     Volume::new(
                         self.relative_url(c.get(2).unwrap().as_str()), // URL
-                        c.get(3).unwrap().into(), // name
-                        self.relative_url(c.get(4).unwrap().as_str()), // thumbnail
+                        c.get(4).unwrap().into(), // name
+                        self.relative_url(c.get(3).unwrap().as_str()), // thumbnail
 
                         self.client.clone(),
                     )

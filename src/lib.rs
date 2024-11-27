@@ -1,4 +1,4 @@
-#![feature(try_blocks, async_closure, lazy_cell)]
+#![feature(try_blocks)]
 
 pub mod digi4school;
 mod scraper;

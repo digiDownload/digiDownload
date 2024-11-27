@@ -1,7 +1,7 @@
 use crate::digi4school::book::Book;
 use crate::error::LoginError;
 use crate::regex;
-use reqwest::{Certificate, Client, Proxy, Url};
+use reqwest::{Client, Url};
 use serde::Serialize;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -21,15 +21,14 @@ impl Session {
     pub(crate) const BASE_URL: &'static str = "https://digi4school.at";
 
     pub async fn new(email: String, password: String) -> Result<Self, LoginError> {
-        let mut builder = Client::builder().cookie_store(true);
+        let builder = Client::builder().cookie_store(true);
 
-        if cfg!(feature = "route_burp") {
-            builder = builder
-                .add_root_certificate(
-                    Certificate::from_der(include_bytes!("../../CERT.DER")).unwrap(),
-                )
-                .proxy(Proxy::https("127.0.0.1:8080").unwrap());
-        }
+        #[cfg(feature = "route_burp")]
+        let builder = builder
+            .add_root_certificate(
+                reqwest::Certificate::from_der(include_bytes!("../../CERT.DER")).unwrap(),
+            )
+            .proxy(reqwest::Proxy::https("127.0.0.1:8080").unwrap());
 
         let session = Self {
             client: Arc::new(builder.build().unwrap()),
@@ -58,7 +57,7 @@ impl Session {
                     m.get(6).unwrap().as_str().parse().unwrap(), // expiration year
                     Url::from_str(m.get(3).unwrap().as_str()).expect("Thumbnail URL is invalid"), // thumbnail
                     m.get(4).unwrap().as_str(), // title
-                    
+
                     self.client.clone(),
                 )
             })

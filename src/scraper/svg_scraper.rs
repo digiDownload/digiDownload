@@ -68,7 +68,13 @@ pub trait SvgScraper: BaseScraper + Sync + Send + Debug {
 
     async fn fetch_page_pdf(&self, page: u16) -> Result<Vec<u8>, reqwest::Error> {
         let svg = self.get_page_svg(page).await?;
-        Ok(svg2pdf::convert_str(&svg, svg2pdf::Options::default()).expect("malformed svg found"))
+        let tree =
+            svg2pdf::usvg::Tree::from_str(&svg, &Default::default()).expect("malformed svg found");
+
+        Ok(
+            svg2pdf::to_pdf(&tree, Default::default(), Default::default())
+                .expect("failed to convert svg to pdf"),
+        )
     }
 }
 

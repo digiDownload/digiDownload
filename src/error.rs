@@ -10,6 +10,18 @@ pub enum ScraperError {
 }
 
 #[derive(Error, Debug)]
+pub enum RedeemCodeError {
+    #[error("The provided book code is invalid")]
+    BadCode,
+
+    #[error("The provided book code has already been redeemed")]
+    ExpiredCode,
+
+    #[error(transparent)]
+    Reqwest(#[from] reqwest::Error),
+}
+
+#[derive(Error, Debug)]
 pub enum LoginError {
     #[error("Your login information was invalid")]
     BadLogin,

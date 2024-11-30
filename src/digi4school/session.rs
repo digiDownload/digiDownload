@@ -1,5 +1,5 @@
 use crate::digi4school::book::Book;
-use crate::error::LoginError;
+use crate::error::{LoginError, RedeemCodeError};
 use crate::regex;
 use reqwest::{Client, Url};
 use serde::Serialize;
@@ -15,6 +15,12 @@ struct LoginData {
     email: String,
     password: String,
     indefinite: u8,
+}
+
+#[derive(Serialize)]
+struct RedeemCodeData {
+    code: String,
+    id: u32,
 }
 
 impl Session {
@@ -64,8 +70,30 @@ impl Session {
             .collect())
     }
 
-    pub fn redeem_code(&self) -> bool {
-        todo!("Program once I can test redeeming a code")
+    /// Attempt to redeem the provided code (XXXX-XXXX-XXXX), returns whether the action succeeds.
+    pub async fn redeem_code(&self, code: String) -> Result<(), RedeemCodeError> {
+        let resp_content = self
+            .client
+            .post(format!("{}/br/xhr/einloesen", Self::BASE_URL))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(serde_urlencoded::to_string(RedeemCodeData { code, id: 0 }).unwrap())
+            .send()
+            .await?
+            .text()
+            .await?;
+
+        let err_code = regex!(r#""err"\s*:\s*(\d+)"#)
+            .captures(resp_content.as_str())
+            .and_then(|cap| cap.get(1))
+            .and_then(|err_code| err_code.as_str().parse::<u32>().ok())
+            .unwrap();
+
+        match err_code {
+            0 => Ok(()),
+            106 => Err(RedeemCodeError::BadCode),
+            100 => Err(RedeemCodeError::ExpiredCode),
+            err => todo!("Handle error code: {}", err),
+        }
     }
 
     async fn login(

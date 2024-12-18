@@ -27,7 +27,6 @@ pub struct Book {
 }
 
 impl Book {
-    const DOMAIN: &'static str = "a.digi4school.at";
     const BASE_URL: &'static str = "https://a.digi4school.at";
 
     pub(crate) fn new(
@@ -54,12 +53,6 @@ impl Book {
             &self.client,
         )
         .await?;
-
-        assert_eq!(
-            resp.url().domain().unwrap(),
-            Self::DOMAIN,
-            "external links are not expected before the Volumes are fetched."
-        );
 
         // If the book is loaded directly (meaning it only has one volume) it will always have a `<DOCTYPE html>` tag.
         if resp.text().starts_with("<!DOCTYPE html>") {

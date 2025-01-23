@@ -21,14 +21,14 @@ reqwest = { version = "0.12.3", default-features = false, features = [
     "http2",
 ] }
 
-scraper = "0.21.0"
+scraper = "0.22.0"
 regex = "1.10.3"
 
 serde = { version = "1.0.197", features = ["derive"] }
 serde_urlencoded = "0.7.1"
 
 svg2pdf = "0.12.0"
-lopdf = "0.34.0"
+lopdf = "0.35.0"
 base64 = "0.22.0"
 
 async-trait = "0.1.77"

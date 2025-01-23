@@ -24,13 +24,3 @@ macro_rules! regex {
         })
     }};
 }
-
-/// Try blocks with a specified error type
-/// Prevents having to assign to a variable
-#[macro_export]
-macro_rules! try_expect {
-    ( $error_type:ty, $expect_message:expr, $code_block:expr ) => {{
-        let err: $error_type = try { $code_block };
-        err.expect($expect_message)
-    }};
-}

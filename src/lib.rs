@@ -1,5 +1,3 @@
-#![feature(try_blocks)]
-
 pub mod digi4school;
 mod scraper;
 

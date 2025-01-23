@@ -1,5 +1,4 @@
 use crate::buffered_response::BufferedResponse;
-use crate::try_expect;
 use reqwest::{Client, Method, Url};
 use scraper::{ElementRef, Html, Selector};
 use std::collections::HashMap;
@@ -32,16 +31,13 @@ impl LTIForm {
 
         let mut iter = doc.root_element().select(&selector);
 
-        Some(try_expect!(Option<_>, "Invalid LTI-form", {
-            let Some(html_form) = iter.next() else {
-                return None;
-            };
+        let html_form = iter.next()?;
 
-            assert!(
-                iter.next().is_none(),
-                "{BAD_LTI_FORM_MESSAGE}: Found 2 valid HTML items for 'form#lti' css selector"
-            );
-            assert_eq!(
+        assert!(
+            iter.next().is_none(),
+            "{BAD_LTI_FORM_MESSAGE}: Found 2 valid HTML items for 'form#lti' css selector"
+        );
+        assert_eq!(
                 Self::expect_form_attr(
                     html_form,
                     "enctype", // originally 'encType' but for some reason scraper converts it to lowercase
@@ -52,38 +48,35 @@ impl LTIForm {
                 "{BAD_LTI_FORM_MESSAGE}: Encoding Type is not 'application/x-www-form-urlencoded' but '{}'",
                 html_form.attr("encType").unwrap()
             );
-            assert_eq!(
-                Self::expect_form_attr(html_form, "name", ""),
-                "ltiLaunchForm",
+        assert_eq!(
+            Self::expect_form_attr(html_form, "name", ""),
+            "ltiLaunchForm",
+            "{BAD_LTI_FORM_MESSAGE}: Does not have `ltiLaunchForm` name, despite having an #lti id"
+        );
 
-                "{BAD_LTI_FORM_MESSAGE}: Does not have `ltiLaunchForm` name, despite having an #lti id"
-            );
+        Some(LTIForm {
+            url: Url::from_str(&Self::expect_form_attr(html_form, "action", "url")).unwrap_or_else(
+                |_| panic!("{BAD_LTI_FORM_MESSAGE}: header 'action' (url) is not a URL"),
+            ),
 
-            LTIForm {
-                url: Url::from_str(&Self::expect_form_attr(html_form, "action", "url"))
-                    .unwrap_or_else(|_| {
-                        panic!("{BAD_LTI_FORM_MESSAGE}: header 'action' (url) is not a URL")
-                    }),
+            method: Method::from_str(
+                &Self::expect_form_attr(html_form, "method", "").to_uppercase(),
+            )
+            .unwrap(), // unwrap is fine because this can't actually fail (bad FromStr implementation)
 
-                method: Method::from_str(
-                    &Self::expect_form_attr(html_form, "method", "").to_uppercase(),
-                )
-                .unwrap(), // unwrap is fine because this can't actually fail (bad FromStr implementation)
+            form_data: html_form
+                .children()
+                .map(|node| {
+                    let element = ElementRef::wrap(node).unwrap();
 
-                form_data: html_form
-                    .children()
-                    .map(|node| {
-                        let element = ElementRef::wrap(node).unwrap();
-
-                        Some((
-                            Self::expect_form_attr(element, "name", ""),
-                            Self::expect_form_attr(element, "value", ""),
-                        ))
-                    })
-                    .collect::<Option<HashMap<String, String>>>()
-                    .unwrap(),
-            }
-        }))
+                    Some((
+                        Self::expect_form_attr(element, "name", ""),
+                        Self::expect_form_attr(element, "value", ""),
+                    ))
+                })
+                .collect::<Option<HashMap<String, String>>>()
+                .unwrap(),
+        })
     }
 
     pub async fn follow_recursively(
